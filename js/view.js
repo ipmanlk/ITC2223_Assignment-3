@@ -54,6 +54,9 @@ function loadChart() {
     // disable view chart button (to prevent multiple requests)
     $("#btnViewChart").attr("disabled", true);
 
+    // show loading spinner
+    $("#imgLoading").fadeIn();
+
     // create new http request using jquery ajax & bind form data
     const request = $.ajax({
         url: "./tasks/getData.php",
@@ -98,12 +101,11 @@ function loadChart() {
     request.fail(function () {
         showOutputMsg("Unable to contact the server!", "danger");
 
-    });
-
-    // after request, always run
-    request.always(function () {
         // enable view chart button
         $("#btnViewChart").attr("disabled", false);
+
+        // hide loading spinner
+        $("#imgLoading").hide();
     });
 }
 
@@ -145,6 +147,16 @@ function showChart(rows, columns) {
 
         // instantiate and draw the chart
         const chart = new google.visualization.LineChart(document.getElementById("outputChart"));
+
+        // after chart is completely loaded and rendered
+        google.visualization.events.addListener(chart, "ready", function () {
+            // enable view chart button
+            $("#btnViewChart").attr("disabled", false);
+
+            // hide loading spinner
+            $("#imgLoading").hide();
+        });
+
         chart.draw(data, options);
     }
 
