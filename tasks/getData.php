@@ -63,3 +63,5 @@ function send_error($msg)
 {
     die(json_encode(array("type" => "error", "msg" => $msg)));
 }
+
+?>
