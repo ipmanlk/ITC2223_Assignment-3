@@ -5,8 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Data</title>
+
+    <!-- libs -->
     <link rel="stylesheet" href="./libs/bootstrap/bootstrap.css">
     <link rel="stylesheet" href="./libs/datetime/jquery.datetimepicker.css">
+    <link rel="stylesheet" href="./libs/bootstrap-select/bootstrap-select.min.css">
 
     <!-- google charts -->
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -49,8 +52,8 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text">Start Date & Time</span>
                             </div>
-                            <input id="txtStartDatetime" type="text" class="form-control"
-                                placeholder="2015/08/01 00:00">
+                            <input id="txtStartDatetime" type="text" class="form-control" placeholder="2015/08/01 00:00"
+                                value="2015/08/01 00:00">
                         </div>
                     </div>
                 </div>
@@ -60,7 +63,8 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text">End Date & Time</span>
                             </div>
-                            <input id="txtEndDatetime" type="text" class="form-control" placeholder="2015/08/01 09:32">
+                            <input id="txtEndDatetime" type="text" class="form-control" placeholder="2015/08/01 09:32"
+                                value="2015/08/01 09:32">
                         </div>
                     </div>
                 </div>
@@ -70,8 +74,7 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text">Category</span>
                             </div>
-                            <select id="cmbCategory" class="form-control">
-                                <option disabled selected>--Please select a category--</option>
+                            <select id="cmbCategories" class="form-control" multiple title="Please select a category">
                                 <option value="power">Power</option>
                                 <option value="temp">Temperature</option>
                                 <option value="humidity">Humidity</option>
@@ -107,6 +110,7 @@
     <script src="./libs/popper/popper.js"></script>
     <script src="./libs/bootstrap/bootstrap.js"></script>
     <script src="./libs/datetime/jquery.datetimepicker.js"></script>
+    <script src="./libs/bootstrap-select/bootstrap-select.min.js"></script>
 
     <!-- script for submitting the form with ajax -->
     <script>
@@ -117,6 +121,9 @@
             $("#txtStartDatetime").datetimepicker();
             $("#txtEndDatetime").datetimepicker();
 
+            // init bootstrap select
+            $("#cmbCategories").selectpicker();
+
             // register event listeners
             $("#viewForm").on("submit", function (e) {
                 e.preventDefault();
@@ -126,7 +133,7 @@
                 const validationInfo = [
                     { "id": "txtStartDatetime", "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/, "error": "Please select a valid start date & time!." },
                     { "id": "txtEndDatetime", "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/, "error": "Please select an end date & time!." },
-                    { "id": "cmbCategory", "regex": /.+/, "error": "Please select a category!." }
+                    { "id": "cmbCategories", "regex": /.+/, "error": "Please select a category!." }
                 ];
 
                 for (let vi of validationInfo) {
@@ -159,7 +166,7 @@
                 data: {
                     startDatetime: $("#txtStartDatetime").val(),
                     endDatetime: $("#txtEndDatetime").val(),
-                    category: $("#cmbCategory").val(),
+                    categories: $("#cmbCategories").val(),
                 }
 
             }).done(function (response) { // when request is completed
@@ -181,17 +188,17 @@
         // render chart using received data and google charts library
         function showChart(responseData) {
 
-            // get selected category and selected category option text
-            const selectedCategory = $("#cmbCategory").val();
-            const selectedCategoryText = $("#cmbCategory option:selected").text();
-
-            // rows array for google charts DataTable object
+            // build rows & columns array for google charts DataTable object using response data
+            const columns = Object.keys(responseData[0]).filter(i => i !== "datetime");
             const rows = [];
 
-            // insert response data into rows array as pairs
             responseData.forEach(i => {
-                rows.push([i["datetime"], parseFloat(i[selectedCategory])])
+                const row = [];
+                row.push(i["datetime"]);
+                columns.forEach(column => row.push(parseFloat(i[column])));
+                rows.push(row);
             });
+
 
             // load neccessary google charts packages
             google.charts.load("current", { "packages": ["corechart"] });
@@ -200,8 +207,18 @@
             function drawChart() {
                 // define chart to be drawn
                 const data = new google.visualization.DataTable();
-                data.addColumn("string", "Datetime");
-                data.addColumn("number", selectedCategoryText);
+
+                // add date & time column
+                data.addColumn("string", "Date & Time");
+
+                // add other category columns such as co2
+                columns.forEach(column => {
+                    // find full text in relevent option for the current column
+                    const fullColumnName = $(`#cmbCategories option[value='${column}']`).text();
+                    data.addColumn("number", fullColumnName);
+                });
+
+                // add rows created beforehand
                 data.addRows(rows);
 
                 // chart options
@@ -210,7 +227,7 @@
                         title: "Date & Time"
                     },
                     vAxis: {
-                        title: selectedCategoryText // set selected category as y axis label
+                        title: "Values"
                     },
                     width: "100%",
                     height: 700,

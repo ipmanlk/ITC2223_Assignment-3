@@ -1,47 +1,59 @@
 <?php
 // get parameters
-$required_parameters = array("startDatetime", "endDatetime", "category");
+$required_parameters = array("startDatetime", "endDatetime", "categories");
 
-$get_data = array();
+// check required parameters are provided
+if (!isset($_GET["startDatetime"]) && empty($_GET["startDatetime"])) {
+    sendError("Please provide a valid start date!.");
+}
 
-// add each get parameter to $get_data array after sanitizing and empty checking
-foreach ($required_parameters as $key) {
-    if (isset($_GET[$key]) && !empty($_GET[$key])) {
-        $get_data[$key] = trim(filter_var($_GET[$key], FILTER_SANITIZE_STRING));
-    } else {
-        sendError("Please provide data for " . $key . ".");
-    }
+if (!isset($_GET["endDatetime"]) && empty($_GET["endDatetime"])) {
+    sendError("Please provide a valid end date!.");
+}
+
+if (!isset($_GET["categories"])) {
+    sendError("Please provide valid categories!.");
 }
 
 // require database connection
 require_once("../config/config.php");
 
-$startDatetime = mysqli_real_escape_string($link, $get_data["startDatetime"]);
-$endDatetime = mysqli_real_escape_string($link, $get_data["endDatetime"]);
-$category = mysqli_real_escape_string($link, $get_data["category"]);
+// assign recieved values to variables
+$startDatetime = mysqli_real_escape_string($link, $_GET["startDatetime"]);
+$endDatetime = mysqli_real_escape_string($link, $_GET["endDatetime"]);
+$categories = $_GET["categories"];
+$categoriesString = mysqli_real_escape_string($link, implode(",", $_GET["categories"]));
 
 // query for selecting data
-$sql = "SELECT $category, datetime FROM sensor_data WHERE datetime > '$startDatetime' AND datetime < '$endDatetime'";
-
+$sql = "SELECT $categoriesString, datetime FROM sensor_data WHERE datetime > '$startDatetime' AND datetime < '$endDatetime'";
 
 // get result set
 $result = mysqli_query($link, $sql);
 
-// store output data
-$data = array();
+// store entries for google chart data table
+$data_table_rows = array();
 
 if (mysqli_num_rows($result) > 0) {
     // output data of each row
     while ($row = mysqli_fetch_assoc($result)) {
-        $data[] = array($category => $row[$category], "datetime" => $row["datetime"]);
+        $entry = array(
+            "datetime" => $row["datetime"]
+        );
+
+        // add category values to entry in order 
+        foreach ($categories as $category) {
+            $entry[$category] = $row[$category];
+        }
+
+        // push to data table rows array
+        array_push($data_table_rows, $entry);
     }
 } else {
     sendError("No records found for given search parameters!.");
 }
 
 // send json data
-echo json_encode(array("type" => "success", "data" => $data));
-
+echo json_encode(array("type" => "success", "data" => $data_table_rows));
 
 // close db connection
 mysqli_close($link);
@@ -51,4 +63,3 @@ function sendError($msg)
 {
     die(json_encode(array("type" => "error", "msg" => $msg)));
 }
-?>

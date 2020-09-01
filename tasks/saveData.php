@@ -43,6 +43,7 @@ if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
         // insert into the database
         $sql = "INSERT INTO sensor_data(power,temp,humidity,light,co2,dust,datetime) VALUES('$power', '$temp', '$humidity', '$light', '$co2', '$dust', '$datetime')";
 
+        // run mysql query and if failed, send error to client
         if (!mysqli_query($link, $sql)) {
             sendError(mysqli_error($link));
         }
