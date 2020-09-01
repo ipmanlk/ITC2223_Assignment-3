@@ -1,6 +1,7 @@
 $(document).ready(initialize);
 
 function initialize() {
+
     // init datetime pickers
     $("#txtStartDatetime").datetimepicker();
     $("#txtEndDatetime").datetimepicker();
@@ -15,30 +16,41 @@ function initialize() {
 
         // object with validation regex and error msg for each form input
         const validationInfo = [
-            { "id": "txtStartDatetime", "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/, "error": "Please select a valid start date & time!." },
-            { "id": "txtEndDatetime", "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/, "error": "Please select an end date & time!." },
-            { "id": "cmbCategories", "regex": /.+/, "error": "Please select a category!." }
+            {
+                "id": "txtStartDatetime",
+                "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/,
+                "error": "Please select a valid start date & time!."
+            },
+            {
+                "id": "txtEndDatetime",
+                "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/,
+                "error": "Please select an end date & time!."
+            },
+            {
+                "id": "cmbCategories",
+                "regex": /.+/,
+                "error": "Please select a category!."
+            }
         ];
 
         for (let vi of validationInfo) {
 
-            // get form value, if null set to "";
+            // get form input value, if null set it to "";
             let value = $(`#${vi.id}`).val();
             if (value == null) value = "";
 
-            // test with regex
+            // test with regex for errors
             if (!vi.regex.test(value)) {
                 showOutputMsg(vi.error, "danger");
                 return;
             }
         }
 
-        getChartData();
+        loadChart();
     });
 }
 
-// get chart data from the server
-function getChartData() {
+function loadChart() {
     // disable view chart button (to prevent multiple requests)
     $("#btnViewChart").attr("disabled", true);
 
@@ -52,44 +64,58 @@ function getChartData() {
             endDatetime: $("#txtEndDatetime").val(),
             categories: $("#cmbCategories").val(),
         }
+    });
 
-    }).done(function (response) { // when request is completed
-        if (response.type == "success") {
-            showChart(response.data);
-        } else {
+    // when request is completed
+    request.done(function (response) {
+
+        // check if server returned any errors
+        if (response.type != "success") {
             showOutputMsg(response.msg, "danger");
+            return;
         }
 
-    }).fail(function () { // when server is unreachable or request failed
+        /* Note
+        Since server returns a large number of records, web worker (seperate thread) is used to minimize
+        UI lagging.
+        */
+
+        // check if browser has web worker support
+        if (window.Worker) {
+            const viewWorker = new Worker("./js/viewWorker.js"); // create new worker instance
+            viewWorker.postMessage(response.data); // send response data to worker
+
+            // when worker sends back response data after processing (as rows and columns for google chart)
+            viewWorker.onmessage = function (e) {
+                showChart(e.data.rows, e.data.columns);
+            }
+        } else {
+            window.alert("Your browser doesn\'t support web workers.");
+        }
+    });
+
+    // when server is unreachable or request failed
+    request.fail(function () {
         showOutputMsg("Unable to contact the server!", "danger");
 
-    }).always(function () { // after request always run
+    });
+
+    // after request, always run
+    request.always(function () {
         // enable view chart button
         $("#btnViewChart").attr("disabled", false);
     });
 }
 
-// render chart using received data and google charts library
-function showChart(responseData) {
-
-    // build rows & columns array for google charts DataTable object using response data
-    const columns = Object.keys(responseData[0]).filter(i => i !== "datetime");
-    const rows = [];
-
-    responseData.forEach(i => {
-        const row = [];
-        row.push(i["datetime"]);
-        columns.forEach(column => row.push(parseFloat(i[column])));
-        rows.push(row);
-    });
-
+// render chart using google charts library
+function showChart(rows, columns) {
 
     // load neccessary google charts packages
     google.charts.load("current", { "packages": ["corechart"] });
 
     // callback function to render chart after onLoad completed
     function drawChart() {
-        // define chart to be drawn
+        // define chart to be drawn using DataTable object
         const data = new google.visualization.DataTable();
 
         // add date & time column
@@ -117,8 +143,8 @@ function showChart(responseData) {
             height: 700,
         };
 
-        // Instantiate and draw the chart.
-        var chart = new google.visualization.LineChart(document.getElementById("outputChart"));
+        // instantiate and draw the chart
+        const chart = new google.visualization.LineChart(document.getElementById("outputChart"));
         chart.draw(data, options);
     }
 
