@@ -1,14 +1,14 @@
 <?php
 // check post data is set
 if (!isset($_FILES["sensorData"])) {
-    sendError("Please provide a CSV file!.");
+    send_error("Please provide a CSV file!.");
 }
 
 // check if provided file is a csv
 $mimes = array("application/vnd.ms-excel", "text/plain", "text/csv", "text/tsv"); //meme types for csv
 
 if (!in_array($_FILES["sensorData"]["type"], $mimes)) {
-    sendError("Please select a valid .csv file");
+    send_error("Please select a valid .csv file");
 }
 
 // require database connection
@@ -18,8 +18,12 @@ require_once("../config/config.php");
 $sql = "TRUNCATE TABLE sensor_data";
 
 if (!mysqli_query($link, $sql)) {
-    sendError(mysqli_error($link));
+    send_error(mysqli_error($link));
 }
+
+$values = ""; // store value sets (rows) for SQL insert statement
+$current_count = 0; // current row count in $values
+$insert_limit = 10000; // how many records (rows) should be inserted at once
 
 // import data from csv
 if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
@@ -40,13 +44,23 @@ if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
             continue;
         }
 
-        // insert into the database
-        $sql = "INSERT INTO sensor_data(power,temp,humidity,light,co2,dust,datetime) VALUES('$power', '$temp', '$humidity', '$light', '$co2', '$dust', '$datetime')";
+        // append to $values string for insert statement
+        $values .= "('$power', '$temp', '$humidity', '$light', '$co2', '$dust', '$datetime'),";
 
-        // run mysql query and if failed, send error to client
-        if (!mysqli_query($link, $sql)) {
-            sendError(mysqli_error($link));
+        // increment current count
+        $current_count++;
+
+        // when current count is same as insert limit, run sql insert query
+        if ($current_count == $insert_limit) {
+            insert_to_table($link, $values);
+            $current_count = 0; // reset current count
+            $values = ""; // clear value string
         }
+    }
+
+    // if there are values left to insert
+    if ($values != "") {
+        insert_to_table($link, $values);
     }
 
     // close file
@@ -59,9 +73,22 @@ if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
     echo json_encode(array("type" => "success", "msg" => "CSV file has been imported successfully!."));
 }
 
+function insert_to_table($link, $values)
+{
+    // remove last comma
+    $values = substr($values, 0, -1);;
+
+    // insert into the database
+    $sql = "INSERT INTO sensor_data(power,temp,humidity,light,co2,dust,datetime) VALUES $values";
+
+    // run mysql query and if failed, send error to client
+    if (!mysqli_query($link, $sql)) {
+        send_error(mysqli_error($link));
+    }
+}
+
 // send error msgs and exit script
-function sendError($msg)
+function send_error($msg)
 {
     die(json_encode(array("type" => "error", "msg" => $msg)));
 }
-?>
