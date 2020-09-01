@@ -25,7 +25,7 @@ $categories = $_GET["categories"];
 $categoriesString = mysqli_real_escape_string($link, implode(",", $_GET["categories"]));
 
 // query for selecting data
-$sql = "SELECT $categoriesString, datetime FROM sensor_data WHERE datetime > '$startDatetime' AND datetime < '$endDatetime'";
+$sql = "SELECT $categoriesString, datetime FROM sensor_data WHERE datetime >= '$startDatetime' AND datetime <= '$endDatetime'";
 
 // get result set
 $result = mysqli_query($link, $sql);
