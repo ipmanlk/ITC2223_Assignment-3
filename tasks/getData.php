@@ -4,15 +4,15 @@ $required_parameters = array("startDatetime", "endDatetime", "categories");
 
 // check required parameters are provided
 if (!isset($_GET["startDatetime"]) && empty($_GET["startDatetime"])) {
-    sendError("Please provide a valid start date!.");
+    send_error("Please provide a valid start date!.");
 }
 
 if (!isset($_GET["endDatetime"]) && empty($_GET["endDatetime"])) {
-    sendError("Please provide a valid end date!.");
+    send_error("Please provide a valid end date!.");
 }
 
 if (!isset($_GET["categories"])) {
-    sendError("Please provide valid categories!.");
+    send_error("Please provide valid categories!.");
 }
 
 // require database connection
@@ -49,7 +49,7 @@ if (mysqli_num_rows($result) > 0) {
         array_push($data_table_rows, $entry);
     }
 } else {
-    sendError("No records found for given search parameters!.");
+    send_error("No records found for given search parameters!.");
 }
 
 // send json data
@@ -59,7 +59,7 @@ echo json_encode(array("type" => "success", "data" => $data_table_rows));
 mysqli_close($link);
 
 // send error msgs and exit script
-function sendError($msg)
+function send_error($msg)
 {
     die(json_encode(array("type" => "error", "msg" => $msg)));
 }
