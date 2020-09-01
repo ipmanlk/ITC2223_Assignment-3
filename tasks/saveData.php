@@ -34,7 +34,8 @@ if ($clear_records == true) {
 
 $values = ""; // store value sets (rows) for SQL insert statement
 $current_count = 0; // current row count in $values
-$insert_limit = 10000; // how many records (rows) should be inserted at once
+$insert_limit = 7000; // how many records (rows) should be inserted at once
+$csv_lines = 0; // keep track of how many lines are in the csv to verify with record count
 
 // import data from csv
 if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
@@ -67,6 +68,9 @@ if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
             $current_count = 0; // reset current count
             $values = ""; // clear value string
         }
+
+        // increment csv lines
+        $csv_lines++;
     }
 
     // if there are values left to insert
@@ -77,11 +81,22 @@ if (($handle = fopen($_FILES["sensorData"]["tmp_name"], "r")) !== FALSE) {
     // close file
     fclose($handle);
 
+    // get row count from table
+    $sql = "SELECT COUNT(id) AS count FROM sensor_data;";
+    $result = mysqli_query($link, $sql);
+    $row = mysqli_fetch_assoc($result);
+    $row_count = $row["count"];
+
     // close db connection
     mysqli_close($link);
 
-    // send success msg
-    echo json_encode(array("type" => "success", "msg" => "CSV file has been imported successfully!."));
+    // compare row count with number of non-empty lines in the csv (except column headers)
+    if ($csv_lines == $row_count) {
+        // send success msg
+        echo json_encode(array("type" => "success", "msg" => "CSV file has been imported successfully!. " . $row_count . "/" . $csv_lines . " records have been created."));
+    } else {
+        echo json_encode(array("type" => "error", "msg" => "CSV file import failed!. Only " . $row_count . "/" . $csv_lines . " records have been created."));
+    }
 }
 
 function insert_to_table($link, $values)
@@ -103,5 +118,3 @@ function send_error($msg)
 {
     die(json_encode(array("type" => "error", "msg" => $msg)));
 }
-
-?>
