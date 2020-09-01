@@ -1,7 +1,7 @@
 <?php
 // check post data is set
-if (!isset($_FILES["sensorData"])) {
-    send_error("Please provide a CSV file!.");
+if (!isset($_FILES["sensorData"]) || !isset($_POST["clearRecords"])) {
+    send_error("Please provide a CSV file and 'true' or 'false' value for clearRecords!.");
 }
 
 // check if provided file is a csv
@@ -11,14 +11,25 @@ if (!in_array($_FILES["sensorData"]["type"], $mimes)) {
     send_error("Please select a valid .csv file");
 }
 
+// check clear records value is valid
+$clear_records = $_POST["clearRecords"];
+if ($clear_records != "true" && $clear_records != "false") {
+    send_error("Please provide a valid value for clearRecords!.");
+}
+
+// assign boolean value for clear records
+$clear_records = ($_POST["clearRecords"] == "true") ? true : false;
+
 // require database connection
 require_once("../config/config.php");
 
-// clear existing records (if there are any) - to prevent duplicates
-$sql = "TRUNCATE TABLE sensor_data";
+if ($clear_records == true) {
+    // clear existing records (if there are any)
+    $sql = "TRUNCATE TABLE sensor_data";
 
-if (!mysqli_query($link, $sql)) {
-    send_error(mysqli_error($link));
+    if (!mysqli_query($link, $sql)) {
+        send_error(mysqli_error($link));
+    }
 }
 
 $values = ""; // store value sets (rows) for SQL insert statement

@@ -27,6 +27,7 @@ function uploadCSV() {
 
     // append file to the form data object
     data.append("sensorData", fileSensorData.files[0]);
+    data.append("clearRecords", $("#chkClear").prop("checked"));
 
     // show please be patient wait msg
     showOutputMsg("Please be patient. Server is processing the file..... <img src='./img/loading.gif' class='loading-spinner'/>");
@@ -45,7 +46,9 @@ function uploadCSV() {
         dataType: "json",
         data: data
 
-    }).done(function (response) { // after request is completed
+    })
+    // after request is completed
+    request.done(function (response) {
         if (response.type == "success") {
             showOutputMsg(response.msg, "success");
         } else {
@@ -55,10 +58,14 @@ function uploadCSV() {
         // reset the form
         $("#uploadForm").trigger("reset");
 
-    }).fail(function () { // when server is unreachable or request failed
+    })
+    // when server is unreachable or request failed
+    request.fail(function () {
         showOutputMsg("Unable to contact the server!", "danger");
 
-    }).always(function () {  // after request always run
+    })
+    // after request always run
+    request.always(function () {
         // enable upload button
         $("#btnUpload").attr("disabled", false);
     });
