@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Data</title>
+    <link rel="stylesheet" href="./libs/bootstrap/bootstrap.css">
+    <link rel="stylesheet" href="./libs/datetime/jquery.datetimepicker.css">
+
+    <!-- google charts -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+    <style>
+        /* styles for making google chart responsive */
+        .chart-wrapper {
+            min-height: 500px;
+            height: 100%;
+            width: 100%;
+            margin: auto;
+            background: #fff;
+            text-align: center;
+        }
+
+        .chart {
+            min-height: 500px;
+            height: 100%;
+            width: 100%;
+            margin: auto;
+            background: #fff;
+            text-align: center
+        }
+    </style>
+</head>
+
+<body>
+    <div class="jumbotron">
+        <h3>Visualize Air-Conditioner Data</h3>
+        <i>Observe data in the database.</i>
+    </div>
+
+    <div class="container-fluid">
+        <!-- main form -->
+        <form id="viewForm">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">Start Date & Time</span>
+                            </div>
+                            <input id="txtStartDatetime" type="text" class="form-control"
+                                placeholder="2015/08/01 00:00">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">End Date & Time</span>
+                            </div>
+                            <input id="txtEndDatetime" type="text" class="form-control" placeholder="2015/08/01 09:32">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">Category</span>
+                            </div>
+                            <select id="cmbCategory" class="form-control">
+                                <option disabled selected>--Please select a category--</option>
+                                <option value="power">Power</option>
+                                <option value="temp">Temperature</option>
+                                <option value="humidity">Humidity</option>
+                                <option value="light">Light</option>
+                                <option value="co2">CO2</option>
+                                <option value="dust">Dust</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <button type="submit" class="btn btn-primary btn-block" id="btnViewChart">View</button>
+                </div>
+            </div>
+            <!-- alert for showing erros and success msgs -->
+            <div id="outputMsg" class="alert alert-success" style="display: none;">
+                <strong>Success!</strong> Indicates a successful or positive action.
+            </div>
+        </form>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="chart-wrapper">
+                    <div id="outputChart" class="chart">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- libs -->
+    <script src="./libs/jquery/jquery.js"></script>
+    <script src="./libs/popper/popper.js"></script>
+    <script src="./libs/bootstrap/bootstrap.js"></script>
+    <script src="./libs/datetime/jquery.datetimepicker.js"></script>
+
+    <!-- script for submitting the form with ajax -->
+    <script>
+        $(document).ready(initialize);
+
+        function initialize() {
+            // init datetime pickers
+            $("#txtStartDatetime").datetimepicker();
+            $("#txtEndDatetime").datetimepicker();
+
+            // register event listeners
+            $("#viewForm").on("submit", function (e) {
+                e.preventDefault();
+                hideOutputMsg();
+
+                // object with validation regex and error msg for each form input
+                const validationInfo = [
+                    { "id": "txtStartDatetime", "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/, "error": "Please select a valid start date & time!." },
+                    { "id": "txtEndDatetime", "regex": /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/, "error": "Please select an end date & time!." },
+                    { "id": "cmbCategory", "regex": /.+/, "error": "Please select a category!." }
+                ];
+
+                for (let vi of validationInfo) {
+
+                    // get form value, if null set to "";
+                    let value = $(`#${vi.id}`).val();
+                    if (value == null) value = "";
+
+                    // test with regex
+                    if (!vi.regex.test(value)) {
+                        showOutputMsg(vi.error, "danger");
+                        return;
+                    }
+                }
+
+                getChartData();
+            });
+        }
+
+        // get chart data from the server
+        function getChartData() {
+            // disable view chart button (to prevent multiple requests)
+            $("#btnViewChart").attr("disabled", true);
+
+            // create new http request using jquery ajax & bind form data
+            const request = $.ajax({
+                url: "./tasks/getData.php",
+                method: "GET",
+                dataType: "json",
+                data: {
+                    startDatetime: $("#txtStartDatetime").val(),
+                    endDatetime: $("#txtEndDatetime").val(),
+                    category: $("#cmbCategory").val(),
+                }
+
+            }).done(function (response) { // when request is completed
+                if (response.type == "success") {
+                    showChart(response.data);
+                } else {
+                    showOutputMsg(response.msg, "danger");
+                }
+
+            }).fail(function () { // when server is unreachable or request failed
+                showOutputMsg("Unable to contact the server!", "danger");
+
+            }).always(function () { // after request always run
+                // enable view chart button
+                $("#btnViewChart").attr("disabled", false);
+            });
+        }
+
+        // render chart using received data and google charts library
+        function showChart(responseData) {
+
+            // get selected category and selected category option text
+            const selectedCategory = $("#cmbCategory").val();
+            const selectedCategoryText = $("#cmbCategory option:selected").text();
+
+            // rows array for google charts DataTable object
+            const rows = [];
+
+            // insert response data into rows array as pairs
+            responseData.forEach(i => {
+                rows.push([i["datetime"], parseFloat(i[selectedCategory])])
+            });
+
+            // load neccessary google charts packages
+            google.charts.load("current", { "packages": ["corechart"] });
+
+            // callback function to render chart after onLoad completed
+            function drawChart() {
+                // define chart to be drawn
+                const data = new google.visualization.DataTable();
+                data.addColumn("string", "Datetime");
+                data.addColumn("number", selectedCategoryText);
+                data.addRows(rows);
+
+                // chart options
+                const options = {
+                    hAxis: {
+                        title: "Date & Time"
+                    },
+                    vAxis: {
+                        title: selectedCategoryText // set selected category as y axis label
+                    },
+                    width: "100%",
+                    height: 700,
+                };
+
+                // Instantiate and draw the chart.
+                var chart = new google.visualization.LineChart(document.getElementById("outputChart"));
+                chart.draw(data, options);
+            }
+
+            // bind callback function to onLoad event
+            google.charts.setOnLoadCallback(drawChart);
+
+            // set event listener for window resize event to make chart responsive.
+            $(window).off("resize"); // remove exisiting event listener (if any)
+
+            $(window).resize(function () {
+                drawChart();
+            });
+        }
+
+        function showOutputMsg(msg, type = "primary") {
+            const outputMsg = $("#outputMsg");
+            outputMsg.removeClass();
+            outputMsg.addClass(`alert alert-${type}`);
+            outputMsg.html(msg);
+            outputMsg.fadeIn();
+        }
+
+        function hideOutputMsg() {
+            $("#outputMsg").hide();
+        }
+    </script>
+</body>
+
+</html>
